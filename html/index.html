@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animal Spawner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #menu-container {
+            display: none;
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 350px;
+            max-height: 80vh;
+            background: rgba(20, 20, 20, 0.95);
+            border: 2px solid rgba(139, 69, 19, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        #menu-container.show {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .menu-header {
+            background: rgba(139, 69, 19, 0.6);
+            padding: 15px;
+            text-align: center;
+            border-bottom: 2px solid rgba(139, 69, 19, 0.8);
+        }
+
+        .menu-header h2 {
+            color: #f4e4c1;
+            font-size: 22px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            margin-bottom: 5px;
+        }
+
+        .menu-header p {
+            color: #ccc;
+            font-size: 12px;
+        }
+
+        .search-box {
+            padding: 10px;
+            background: rgba(30, 30, 30, 0.9);
+            border-bottom: 1px solid rgba(139, 69, 19, 0.5);
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(50, 50, 50, 0.9);
+            border: 1px solid rgba(139, 69, 19, 0.6);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .search-box input:focus {
+            border-color: rgba(139, 69, 19, 1);
+        }
+
+        .animal-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .animal-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .animal-list::-webkit-scrollbar-track {
+            background: rgba(30, 30, 30, 0.5);
+        }
+
+        .animal-list::-webkit-scrollbar-thumb {
+            background: rgba(139, 69, 19, 0.8);
+            border-radius: 4px;
+        }
+
+        .animal-item {
+            padding: 12px 15px;
+            margin: 5px;
+            background: rgba(40, 40, 40, 0.8);
+            border: 1px solid rgba(139, 69, 19, 0.4);
+            border-radius: 4px;
+            color: #f4e4c1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .animal-item:hover {
+            background: rgba(139, 69, 19, 0.4);
+            border-color: rgba(139, 69, 19, 0.8);
+            transform: translateX(-5px);
+        }
+
+        .animal-item.active {
+            background: rgba(139, 69, 19, 0.6);
+            border-color: rgba(139, 69, 19, 1);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            background: rgba(139, 69, 19, 0.8);
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(180, 90, 30, 0.9);
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu-container">
+        <button class="close-btn" onclick="closeMenu()">×</button>
+        <div class="menu-header">
+            <h2>Animal Spawner</h2>
+            <p>Select an animal to spawn</p>
+        </div>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search animals..." onkeyup="filterAnimals()">
+        </div>
+        <div class="animal-list" id="animal-list"></div>
+    </div>
+
+    <script>
+        let animals = [];
+        let currentAnimal = null;
+        let resourceName = '';
+
+        // Get the actual resource name from the URL
+        window.addEventListener('load', () => {
+            const match = window.location.href.match(/https?:\/\/([^\/]+)\//);
+            if (match) {
+                // Remove cfx-nui- prefix if it exists
+                resourceName = match[1].replace('cfx-nui-', '');
+                console.log('[Animal Spawner] Resource name detected:', resourceName);
+            }
+        });
+
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            
+            if (data.action === 'show') {
+                animals = data.animals;
+                document.getElementById('menu-container').classList.add('show');
+                renderAnimals(animals);
+                document.getElementById('search-input').value = '';
+                document.getElementById('search-input').focus();
+                
+                console.log('[Animal Spawner] Menu opened with', animals.length, 'animals');
+            } else if (data.action === 'hide') {
+                document.getElementById('menu-container').classList.remove('show');
+            }
+        });
+
+        function renderAnimals(animalList) {
+            const listContainer = document.getElementById('animal-list');
+            listContainer.innerHTML = '';
+
+            if (animalList.length === 0) {
+                listContainer.innerHTML = '<div class="no-results">No animals found</div>';
+                return;
+            }
+
+            animalList.forEach((animal) => {
+                const item = document.createElement('div');
+                item.className = 'animal-item';
+                item.textContent = animal.label;
+                item.onclick = () => spawnAnimal(animal);
+                listContainer.appendChild(item);
+            });
+        }
+
+        function filterAnimals() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const filtered = animals.filter(animal => 
+                animal.label.toLowerCase().includes(searchTerm)
+            );
+            renderAnimals(filtered);
+        }
+
+        function spawnAnimal(animal) {
+            console.log('[Animal Spawner] Spawning animal:', animal.label, animal.model);
+            <!-- console.log('[Animal Spawner] Using resource name:', resourceName); -->
+            
+            // Highlight selected animal
+            document.querySelectorAll('.animal-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Send to client - use detected resource name
+            const url = `https://${resourceName}/spawnAnimal`;
+            <!-- console.log('[Animal Spawner] Fetching URL:', url); -->
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: animal.model
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                <!-- console.log('[Animal Spawner] Response received:', data); -->
+            })
+            .catch(error => {
+                console.error('[Animal Spawner] Error spawning animal:', error);
+            });
+        }
+
+        function closeMenu() {
+            fetch(`https://${resourceName}/closeMenu`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+        }
+
+        // Close menu with ESC key
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeMenu();
+            }
+        });
+    </script>
+</body>
+</html>
